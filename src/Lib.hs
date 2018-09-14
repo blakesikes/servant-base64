@@ -1,5 +1,6 @@
-{-# LANGUAGE DataKinds         #-}
-{-# LANGUAGE TypeOperators     #-}
+{-# LANGUAGE DataKinds             #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE TypeOperators         #-}
 module Lib
     ( startApp
     , app
@@ -8,6 +9,8 @@ module Lib
 import           Data.ByteString
 import           Data.ByteString.Base64
 import           Data.ByteString.Builder
+import           Data.Text
+import           Data.Text.Encoding
 import           Network.Wai
 import           Network.Wai.Handler.Warp
 import           Servant
@@ -15,8 +18,8 @@ import           Servant
 import qualified Data.ByteString.Char8    as B
 import qualified Data.ByteString.Lazy     as L
 
-type Api = "decode" :> ReqBody '[PlainText] String :> Post '[PlainText] String
-      :<|> "encode" :> ReqBody '[PlainText] String :> Post '[PlainText] String
+type Api = "decode" :> ReqBody '[PlainText] Text :> Post '[PlainText] Text
+      :<|> "encode" :> ReqBody '[PlainText] Text :> Post '[PlainText] Text
 
 startApp :: IO ()
 startApp = run 8080 app
@@ -30,7 +33,7 @@ api = Proxy
 server :: Server Api
 server = decodeHandler :<|> encodeHandler
 
-decodeHandler :: String -> Handler String
+decodeHandler :: Text-> Handler Text
 decodeHandler input = do
   let res = decodeBase64 input
   case res of
@@ -40,14 +43,14 @@ decodeHandler input = do
 buildLazyMsg :: String -> L.ByteString
 buildLazyMsg errMsg = toLazyByteString $ string8 errMsg
 
-decodeBase64 :: String -> Either String String
+decodeBase64 :: Text -> Either String Text
 decodeBase64 input = do
-  let bs = B.pack input
-  res <- decode bs
-  return $ B.unpack res
+  let inputText = encodeUtf8 input
+  outputBS <- decode inputText
+  return $ decodeUtf8 outputBS
 
-encodeHandler :: String -> Handler String
+encodeHandler :: Text -> Handler Text
 encodeHandler input = return $ encodeBase64 input
 
-encodeBase64 :: String -> String
-encodeBase64 = B.unpack . encode . B.pack
+encodeBase64 :: Text -> Text
+encodeBase64 = decodeUtf8 . encode . encodeUtf8
